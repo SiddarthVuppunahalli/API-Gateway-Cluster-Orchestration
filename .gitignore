@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+*.pyc
+*.pyo
+bin/
+dist/
+coverage/
+.DS_Store
+*.log
+worker/.venv/
+gateway/.cache/

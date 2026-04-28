@@ -1,0 +1,46 @@
+services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.gateway
+    environment:
+      GATEWAY_PORT: "8080"
+      WORKER_URLS: "http://worker-a:9001,http://worker-b:9001,http://worker-c:9001"
+      QUEUE_CAPACITY: "256"
+      DISPATCH_WORKERS: "32"
+      REQUEST_TIMEOUT_SECONDS: "8"
+      WORKER_REFRESH_MS: "1500"
+      WORKER_STALE_AFTER_MS: "5000"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - worker-a
+      - worker-b
+      - worker-c
+
+  worker-a:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.worker
+    environment:
+      WORKER_ID: "worker-a"
+      BASE_DELAY_MS: "250"
+      MAX_CONCURRENT: "8"
+
+  worker-b:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.worker
+    environment:
+      WORKER_ID: "worker-b"
+      BASE_DELAY_MS: "300"
+      MAX_CONCURRENT: "6"
+
+  worker-c:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.worker
+    environment:
+      WORKER_ID: "worker-c"
+      BASE_DELAY_MS: "200"
+      MAX_CONCURRENT: "10"
