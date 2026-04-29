@@ -11,3 +11,6 @@ coverage/
 *.log
 worker/.venv/
 gateway/.cache/
+benchmarks/*.json
+benchmarks/*.md
+!benchmarks/.gitkeep

@@ -18,6 +18,7 @@ func main() {
 	cfg := config.Load()
 	rt := router.New(
 		cfg.WorkerURLs,
+		cfg.RoutingStrategy,
 		time.Duration(cfg.RefreshInterval)*time.Millisecond,
 		time.Duration(cfg.WorkerStaleAfter)*time.Millisecond,
 	)
@@ -69,11 +70,12 @@ func main() {
 
 	addr := ":" + cfg.Port
 	log.Printf(
-		"gateway listening on %s with %d workers, queue_capacity=%d, dispatch_workers=%d",
+		"gateway listening on %s with %d workers, queue_capacity=%d, dispatch_workers=%d, routing_strategy=%s",
 		addr,
 		len(cfg.WorkerURLs),
 		cfg.QueueCapacity,
 		cfg.DispatchWorkers,
+		cfg.RoutingStrategy,
 	)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)

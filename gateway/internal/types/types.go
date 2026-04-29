@@ -49,9 +49,12 @@ type WorkerSnapshot struct {
 }
 
 type RouterStats struct {
+	Strategy          string           `json:"strategy"`
 	RefreshIntervalMS int              `json:"refresh_interval_ms"`
 	StaleAfterMS      int              `json:"stale_after_ms"`
 	CachedWorkers     int              `json:"cached_workers"`
 	HealthyWorkers    int              `json:"healthy_workers"`
+	AvailableWorkers  int              `json:"available_workers"`
+	SaturatedWorkers  int              `json:"saturated_workers"`
 	Workers           []WorkerSnapshot `json:"workers"`
 }

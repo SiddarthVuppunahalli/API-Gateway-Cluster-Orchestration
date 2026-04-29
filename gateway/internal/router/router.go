@@ -10,10 +10,13 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sidda/api-gateway-cluster-orchestration/gateway/internal/types"
 )
+
+var errWorkerSaturated = errors.New("worker saturated")
 
 type workerState struct {
 	baseURL string
@@ -30,18 +33,21 @@ type cachedWorker struct {
 type Router struct {
 	client          *http.Client
 	workerURLs      []string
+	strategy        string
 	refreshInterval time.Duration
 	staleAfter      time.Duration
 	mu              sync.RWMutex
 	workers         map[string]*cachedWorker
+	rrCounter       atomic.Uint64
 }
 
-func New(workerURLs []string, refreshInterval, staleAfter time.Duration) *Router {
+func New(workerURLs []string, strategy string, refreshInterval, staleAfter time.Duration) *Router {
 	r := &Router{
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
 		workerURLs:      workerURLs,
+		strategy:        normalizeStrategy(strategy),
 		refreshInterval: refreshInterval,
 		staleAfter:      staleAfter,
 		workers:         make(map[string]*cachedWorker, len(workerURLs)),
@@ -67,33 +73,50 @@ func New(workerURLs []string, refreshInterval, staleAfter time.Duration) *Router
 
 func (r *Router) Route(ctx context.Context, req types.InferenceRequest) (types.InferenceResponse, error) {
 	estimatedCost := estimateRequestCost(req)
-	workers := r.rankWorkers(estimatedCost)
-	if len(workers) == 0 {
-		refreshCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		r.refreshWorkerStates(refreshCtx)
-		workers = r.rankWorkers(estimatedCost)
+	for {
+		workers := r.rankWorkers(estimatedCost)
 		if len(workers) == 0 {
-			return types.InferenceResponse{}, errors.New("no healthy workers available")
+			refreshCtx, cancel := context.WithTimeout(ctx, minDuration(2*time.Second, r.refreshInterval))
+			r.refreshWorkerStates(refreshCtx)
+			cancel()
+
+			workers = r.rankWorkers(estimatedCost)
+			if len(workers) == 0 {
+				if err := waitForRetry(ctx, 40*time.Millisecond); err != nil {
+					return types.InferenceResponse{}, errors.New("cluster remained saturated until request timeout")
+				}
+				continue
+			}
 		}
-	}
 
-	var lastErr error
-	for _, worker := range workers {
-		r.reserve(worker.baseURL, estimatedCost)
-		resp, dispatchErr := r.dispatch(ctx, worker.baseURL, req)
-		r.release(worker.baseURL, estimatedCost, dispatchErr)
-		if dispatchErr == nil {
-			return types.InferenceResponse(resp), nil
+		var lastErr error
+		sawSaturation := false
+		for _, worker := range workers {
+			r.reserve(worker.baseURL, estimatedCost)
+			resp, dispatchErr := r.dispatch(ctx, worker.baseURL, req)
+			r.release(worker.baseURL, estimatedCost, dispatchErr)
+			if dispatchErr == nil {
+				return types.InferenceResponse(resp), nil
+			}
+			if errors.Is(dispatchErr, errWorkerSaturated) {
+				sawSaturation = true
+				continue
+			}
+			lastErr = dispatchErr
 		}
-		lastErr = dispatchErr
-	}
 
-	if lastErr == nil {
-		lastErr = errors.New("failed to dispatch request")
-	}
+		if sawSaturation {
+			if err := waitForRetry(ctx, 40*time.Millisecond); err != nil {
+				return types.InferenceResponse{}, errors.New("cluster remained saturated until request timeout")
+			}
+			continue
+		}
 
-	return types.InferenceResponse{}, lastErr
+		if lastErr == nil {
+			lastErr = errors.New("failed to dispatch request")
+		}
+		return types.InferenceResponse{}, lastErr
+	}
 }
 
 func (r *Router) Stats() types.RouterStats {
@@ -102,6 +125,8 @@ func (r *Router) Stats() types.RouterStats {
 
 	snapshots := make([]types.WorkerSnapshot, 0, len(r.workers))
 	healthy := 0
+	available := 0
+	saturated := 0
 	now := time.Now()
 	for _, workerURL := range r.workerURLs {
 		worker := r.workers[workerURL]
@@ -109,8 +134,15 @@ func (r *Router) Stats() types.RouterStats {
 			continue
 		}
 		isHealthy := r.isHealthy(worker, now)
+		hasCapacity := r.hasCapacity(worker)
 		if isHealthy {
 			healthy++
+		}
+		if isHealthy && hasCapacity {
+			available++
+		}
+		if isHealthy && !hasCapacity {
+			saturated++
 		}
 		snapshots = append(snapshots, types.WorkerSnapshot{
 			WorkerID:          worker.capacity.WorkerID,
@@ -125,15 +157,25 @@ func (r *Router) Stats() types.RouterStats {
 	}
 
 	return types.RouterStats{
+		Strategy:          r.strategy,
 		RefreshIntervalMS: int(r.refreshInterval / time.Millisecond),
 		StaleAfterMS:      int(r.staleAfter / time.Millisecond),
 		CachedWorkers:     len(snapshots),
 		HealthyWorkers:    healthy,
+		AvailableWorkers:  available,
+		SaturatedWorkers:  saturated,
 		Workers:           snapshots,
 	}
 }
 
 func (r *Router) rankWorkers(requestCost int) []workerState {
+	if r.strategy == "round_robin" {
+		return r.roundRobinWorkers()
+	}
+	return r.costAwareWorkers(requestCost)
+}
+
+func (r *Router) costAwareWorkers(requestCost int) []workerState {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -141,7 +183,7 @@ func (r *Router) rankWorkers(requestCost int) []workerState {
 	workers := make([]workerState, 0, len(r.workers))
 	for _, workerURL := range r.workerURLs {
 		worker := r.workers[workerURL]
-		if worker == nil || !r.isHealthy(worker, now) {
+		if worker == nil || !r.isHealthy(worker, now) || !r.hasCapacity(worker) {
 			continue
 		}
 
@@ -162,6 +204,35 @@ func (r *Router) rankWorkers(requestCost int) []workerState {
 	})
 
 	return workers
+}
+
+func (r *Router) roundRobinWorkers() []workerState {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	now := time.Now()
+	healthy := make([]workerState, 0, len(r.workers))
+	for _, workerURL := range r.workerURLs {
+		worker := r.workers[workerURL]
+		if worker == nil || !r.isHealthy(worker, now) || !r.hasCapacity(worker) {
+			continue
+		}
+		healthy = append(healthy, workerState{
+			baseURL: worker.baseURL,
+		})
+	}
+
+	if len(healthy) <= 1 {
+		return healthy
+	}
+
+	start := int(r.rrCounter.Add(1)-1) % len(healthy)
+	ordered := make([]workerState, 0, len(healthy))
+	for i := 0; i < len(healthy); i++ {
+		ordered = append(ordered, healthy[(start+i)%len(healthy)])
+	}
+
+	return ordered
 }
 
 func (r *Router) refreshLoop() {
@@ -215,6 +286,11 @@ func (r *Router) release(workerURL string, requestCost int, dispatchErr error) {
 	worker.capacity.QueuedTokens = max(worker.capacity.QueuedTokens-requestCost, 0)
 
 	if dispatchErr != nil {
+		if errors.Is(dispatchErr, errWorkerSaturated) {
+			worker.capacity.Healthy = true
+			worker.lastUpdated = time.Now()
+			return
+		}
 		worker.consecutiveErrors++
 		if worker.consecutiveErrors >= 2 {
 			worker.capacity.Healthy = false
@@ -292,6 +368,9 @@ func (r *Router) dispatch(ctx context.Context, workerURL string, payload types.I
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= http.StatusBadRequest {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return types.WorkerGenerateResponse{}, errWorkerSaturated
+		}
 		return types.WorkerGenerateResponse{}, fmt.Errorf("worker returned status %d", resp.StatusCode)
 	}
 
@@ -321,4 +400,40 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (r *Router) hasCapacity(worker *cachedWorker) bool {
+	if worker == nil {
+		return false
+	}
+	maxConcurrent := max(worker.capacity.MaxConcurrent, 1)
+	return worker.capacity.ActiveRequests < maxConcurrent
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func minDuration(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func normalizeStrategy(strategy string) string {
+	switch strings.ToLower(strings.TrimSpace(strategy)) {
+	case "round_robin", "round-robin", "rr":
+		return "round_robin"
+	default:
+		return "cost"
+	}
 }

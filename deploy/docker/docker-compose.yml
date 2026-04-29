@@ -11,6 +11,7 @@ services:
       REQUEST_TIMEOUT_SECONDS: "8"
       WORKER_REFRESH_MS: "1500"
       WORKER_STALE_AFTER_MS: "5000"
+      ROUTING_STRATEGY: "cost"
     ports:
       - "8080:8080"
     depends_on:

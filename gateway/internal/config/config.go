@@ -7,13 +7,14 @@ import (
 )
 
 type Config struct {
-	Port            string
-	WorkerURLs      []string
-	QueueCapacity   int
-	DispatchWorkers int
-	RequestTimeout  int
-	RefreshInterval int
+	Port             string
+	WorkerURLs       []string
+	QueueCapacity    int
+	DispatchWorkers  int
+	RequestTimeout   int
+	RefreshInterval  int
 	WorkerStaleAfter int
+	RoutingStrategy  string
 }
 
 func Load() Config {
@@ -40,6 +41,7 @@ func Load() Config {
 	requestTimeout := readIntEnv("REQUEST_TIMEOUT_SECONDS", 8)
 	refreshInterval := readIntEnv("WORKER_REFRESH_MS", 1500)
 	workerStaleAfter := readIntEnv("WORKER_STALE_AFTER_MS", 5000)
+	routingStrategy := readStringEnv("ROUTING_STRATEGY", "cost")
 
 	return Config{
 		Port:             port,
@@ -49,6 +51,7 @@ func Load() Config {
 		RequestTimeout:   requestTimeout,
 		RefreshInterval:  refreshInterval,
 		WorkerStaleAfter: workerStaleAfter,
+		RoutingStrategy:  routingStrategy,
 	}
 }
 
@@ -64,4 +67,12 @@ func readIntEnv(key string, fallback int) int {
 	}
 
 	return value
+}
+
+func readStringEnv(key, fallback string) string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	return strings.ToLower(raw)
 }

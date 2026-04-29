@@ -58,8 +58,9 @@ Request flow in the current phase:
 2. Gateway validates the request and attempts to place it into a bounded in-memory admission queue.
 3. A dispatcher goroutine pulls work from the queue and estimates request cost from prompt length and token budget.
 4. The router scores workers using a periodically refreshed capacity cache instead of probing every worker on every request.
-5. Worker simulates batching and generation delay, then returns a synthetic completion.
-6. Gateway exposes queue and router-state statistics through a lightweight stats endpoint.
+5. If the cluster is temporarily full, the gateway waits and retries instead of immediately failing on worker saturation.
+6. Worker simulates batching and generation delay, then returns a synthetic completion.
+7. Gateway exposes queue and router-state statistics through a lightweight stats endpoint.
 
 Later phases add:
 
@@ -152,7 +153,7 @@ Deliverables:
 
 - request cost model from prompt length and token target
 - periodic worker-state cache with staleness windows
-- richer routing heuristic than "least loaded"
+- configurable routing strategies with round-robin baseline and cost-aware scheduling
 - side-by-side comparison against round robin
 
 ### Phase 4: Kubernetes and Failure Recovery
@@ -197,6 +198,17 @@ Gateway:
 - `http://localhost:8080/infer`
 - `http://localhost:8080/stats`
 
+Routing mode can be switched with:
+
+```bash
+ROUTING_STRATEGY=cost
+```
+
+Supported values:
+
+- `cost`
+- `round_robin`
+
 ### Option 2: Run Services Directly
 
 Gateway:
@@ -218,6 +230,12 @@ Worker:
 cd worker
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 9001
+```
+
+On Windows PowerShell, you can launch all three local workers with:
+
+```powershell
+.\scripts\start-workers.ps1
 ```
 
 ## Example Request
@@ -251,13 +269,100 @@ Example stats response:
   "rejected_requests": 0,
   "failed_requests": 0,
   "router": {
+    "strategy": "cost",
     "refresh_interval_ms": 1500,
     "stale_after_ms": 5000,
     "cached_workers": 3,
-    "healthy_workers": 3
+    "healthy_workers": 3,
+    "available_workers": 2,
+    "saturated_workers": 1
   }
 }
 ```
+
+## Reading `/stats`
+
+The `/stats` endpoint is a live snapshot of gateway state, not a permanent final report.
+
+Key fields:
+
+- `queue_depth`: how many requests are currently waiting inside the gateway queue
+- `accepted_requests`: how many requests entered the gateway queue during this process lifetime
+- `completed_requests`: how many requests finished successfully through the gateway
+- `failed_requests`: how many requests the gateway gave up on
+- `router.strategy`: the active routing mode, either `round_robin` or `cost`
+- `router.healthy_workers`: workers considered usable from the cached control-plane view
+- `router.available_workers`: healthy workers with free capacity right now
+- `router.saturated_workers`: healthy workers that are currently full
+
+How to think about it:
+
+- `load_spike.py` tells you user-facing outcomes such as success rate and latency
+- `/stats` tells you what the gateway looked like at one moment in time
+- the benchmark report captures specific `/stats` snapshots before and after the run
+
+## Benchmarking Strategy Comparison
+
+Run the gateway once with:
+
+```bash
+ROUTING_STRATEGY=round_robin
+go run ./gateway/cmd/server
+```
+
+Then repeat with:
+
+```bash
+ROUTING_STRATEGY=cost
+go run ./gateway/cmd/server
+```
+
+For each mode, use the same stress command:
+
+```bash
+python tests/stress/load_spike.py --requests 300 --concurrency 64 --prompt-size 256 --max-tokens 256 --workload mixed
+```
+
+Compare:
+
+- requests per second
+- p95 and p99 latency
+- status-code distribution
+- `/stats` router state before and after the run
+
+If you still see many timeout-style failures during heavy bursts, increase the gateway deadline for benchmarking:
+
+```bash
+REQUEST_TIMEOUT_SECONDS=20
+```
+
+To automate the comparison, keep the workers running and use:
+
+```bash
+python tests/stress/run_strategy_benchmark.py --requests 300 --concurrency 64 --prompt-size 256 --max-tokens 256 --workload mixed
+```
+
+This will:
+
+- start the gateway in `round_robin`
+- run the load test and capture `/stats`
+- restart the gateway in `cost`
+- run the same load test and capture `/stats`
+- write a JSON report and Markdown summary under `benchmarks/`
+
+The benchmark artifacts also break down non-HTTP failures by reason so you can separate:
+
+- request timeouts
+- connection-level issues
+- HTTP-level gateway failures
+
+A running summary of benchmark findings lives in [docs/benchmarks.md](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/docs/benchmarks.md).
+
+Why `mixed` workload matters:
+
+- uniform requests often make round-robin look deceptively strong
+- mixed request sizes create uneven compute pressure across workers
+- compute-aware routing should be easier to distinguish under heterogeneous request cost
 
 ## Success Criteria
 
@@ -279,4 +384,4 @@ The running design rationale lives in [docs/concepts.md](C:/Users/sidda/projects
 
 ## Current Focus
 
-The gateway now has a bounded queue, asynchronous dispatch path, and cached worker-state routing. The next engineering milestone is adding richer worker heartbeats, benchmark comparisons against round robin, and then carrying that behavior into Kubernetes failure testing.
+The gateway now supports both cached cost-aware routing and a round-robin baseline, and it treats temporary worker saturation as a scheduling problem instead of an immediate hard failure. The next engineering milestone is to benchmark those modes again, add richer worker heartbeats, and then carry the behavior into Kubernetes failure testing.
