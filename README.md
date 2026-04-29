@@ -358,6 +358,8 @@ The benchmark artifacts also break down non-HTTP failures by reason so you can s
 
 A running summary of benchmark findings lives in [docs/benchmarks.md](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/docs/benchmarks.md).
 
+For Kubernetes-based strategy comparison, use [tests/stress/run_k8s_strategy_benchmark.py](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/tests/stress/run_k8s_strategy_benchmark.py), which patches the in-cluster gateway ConfigMap and restarts the Deployment between runs.
+
 Why `mixed` workload matters:
 
 - uniform requests often make round-robin look deceptively strong
@@ -381,6 +383,8 @@ Each phase should also leave behind three visible artifacts:
 - a README or docs update that explains the design tradeoff
 
 The running design rationale lives in [docs/concepts.md](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/docs/concepts.md), which is updated as each phase lands.
+
+The current Kubernetes deployment notes live in [docs/kubernetes.md](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/docs/kubernetes.md).
 
 ## Current Focus
 

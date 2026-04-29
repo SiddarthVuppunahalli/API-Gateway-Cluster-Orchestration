@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-a
+  namespace: llm-sim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-a
+  template:
+    metadata:
+      labels:
+        app: worker-a
+        role: worker
+    spec:
+      containers:
+        - name: worker
+          image: llm-worker:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9001
+          env:
+            - name: WORKER_ID
+              value: worker-a
+            - name: BASE_DELAY_MS
+              value: "250"
+            - name: MAX_CONCURRENT
+              value: "8"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9001
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-a
+  namespace: llm-sim
+spec:
+  selector:
+    app: worker-a
+  ports:
+    - port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-b
+  namespace: llm-sim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-b
+  template:
+    metadata:
+      labels:
+        app: worker-b
+        role: worker
+    spec:
+      containers:
+        - name: worker
+          image: llm-worker:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9001
+          env:
+            - name: WORKER_ID
+              value: worker-b
+            - name: BASE_DELAY_MS
+              value: "300"
+            - name: MAX_CONCURRENT
+              value: "6"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9001
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-b
+  namespace: llm-sim
+spec:
+  selector:
+    app: worker-b
+  ports:
+    - port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-c
+  namespace: llm-sim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-c
+  template:
+    metadata:
+      labels:
+        app: worker-c
+        role: worker
+    spec:
+      containers:
+        - name: worker
+          image: llm-worker:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9001
+          env:
+            - name: WORKER_ID
+              value: worker-c
+            - name: BASE_DELAY_MS
+              value: "200"
+            - name: MAX_CONCURRENT
+              value: "10"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9001
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-c
+  namespace: llm-sim
+spec:
+  selector:
+    app: worker-c
+  ports:
+    - port: 9001
+      targetPort: 9001

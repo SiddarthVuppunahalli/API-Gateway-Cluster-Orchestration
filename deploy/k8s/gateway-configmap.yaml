@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: llm-sim
+data:
+  GATEWAY_PORT: "8080"
+  WORKER_URLS: "http://worker-a:9001,http://worker-b:9001,http://worker-c:9001"
+  QUEUE_CAPACITY: "50"
+  DISPATCH_WORKERS: "32"
+  REQUEST_TIMEOUT_SECONDS: "20"
+  WORKER_REFRESH_MS: "1500"
+  WORKER_STALE_AFTER_MS: "5000"
+  ROUTING_STRATEGY: "cost"
