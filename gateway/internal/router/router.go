@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sidda/api-gateway-cluster-orchestration/gateway/internal/types"
+	"github.com/sony/gobreaker/v2"
 )
 
 var errWorkerSaturated = errors.New("worker saturated")
@@ -28,6 +29,7 @@ type cachedWorker struct {
 	capacity          types.WorkerCapacity
 	lastUpdated       time.Time
 	consecutiveErrors int
+	cb                *gobreaker.CircuitBreaker[types.WorkerGenerateResponse]
 }
 
 type Router struct {
@@ -60,6 +62,18 @@ func New(workerURLs []string, strategy string, refreshInterval, staleAfter time.
 				WorkerID:      workerNameFromURL(workerURL),
 				MaxConcurrent: 1,
 			},
+			cb: gobreaker.NewCircuitBreaker[types.WorkerGenerateResponse](gobreaker.Settings{
+				Name:        workerURL,
+				MaxRequests: 1,
+				Interval:    0,
+				Timeout:     10 * time.Second,
+				ReadyToTrip: func(counts gobreaker.Counts) bool {
+					return counts.ConsecutiveFailures > 3
+				},
+				IsSuccessful: func(err error) bool {
+					return err == nil || errors.Is(err, errWorkerSaturated)
+				},
+			}),
 		}
 	}
 
@@ -76,17 +90,10 @@ func (r *Router) Route(ctx context.Context, req types.InferenceRequest) (types.I
 	for {
 		workers := r.rankWorkers(estimatedCost)
 		if len(workers) == 0 {
-			refreshCtx, cancel := context.WithTimeout(ctx, minDuration(2*time.Second, r.refreshInterval))
-			r.refreshWorkerStates(refreshCtx)
-			cancel()
-
-			workers = r.rankWorkers(estimatedCost)
-			if len(workers) == 0 {
-				if err := waitForRetry(ctx, 40*time.Millisecond); err != nil {
-					return types.InferenceResponse{}, errors.New("cluster remained saturated until request timeout")
-				}
-				continue
+			if err := waitForRetry(ctx, 40*time.Millisecond); err != nil {
+				return types.InferenceResponse{}, errors.New("cluster remained saturated until request timeout")
 			}
+			continue
 		}
 
 		var lastErr error
@@ -188,10 +195,8 @@ func (r *Router) costAwareWorkers(requestCost int) []workerState {
 		}
 
 		maxConcurrent := max(worker.capacity.MaxConcurrent, 1)
-		projectedActive := worker.capacity.ActiveRequests + 1
 		projectedQueued := worker.capacity.QueuedTokens + requestCost
-		utilization := float64(projectedActive) / float64(maxConcurrent)
-		score := utilization*100000 + float64(projectedQueued)
+		score := float64(projectedQueued) / float64(maxConcurrent)
 
 		workers = append(workers, workerState{
 			baseURL: worker.baseURL,
@@ -312,6 +317,18 @@ func (r *Router) ensureWorker(workerURL string) *cachedWorker {
 				WorkerID:      workerNameFromURL(workerURL),
 				MaxConcurrent: 1,
 			},
+			cb: gobreaker.NewCircuitBreaker[types.WorkerGenerateResponse](gobreaker.Settings{
+				Name:        workerURL,
+				MaxRequests: 1,
+				Interval:    0,
+				Timeout:     10 * time.Second,
+				ReadyToTrip: func(counts gobreaker.Counts) bool {
+					return counts.ConsecutiveFailures > 3
+				},
+				IsSuccessful: func(err error) bool {
+					return err == nil || errors.Is(err, errWorkerSaturated)
+				},
+			}),
 		}
 		r.workers[workerURL] = worker
 	}
@@ -320,6 +337,9 @@ func (r *Router) ensureWorker(workerURL string) *cachedWorker {
 
 func (r *Router) isHealthy(worker *cachedWorker, now time.Time) bool {
 	if worker == nil || !worker.capacity.Healthy || worker.lastUpdated.IsZero() {
+		return false
+	}
+	if worker.cb.State() == gobreaker.StateOpen {
 		return false
 	}
 	return now.Sub(worker.lastUpdated) <= r.staleAfter
@@ -350,36 +370,45 @@ func (r *Router) fetchCapacity(ctx context.Context, workerURL string) (types.Wor
 }
 
 func (r *Router) dispatch(ctx context.Context, workerURL string, payload types.InferenceRequest) (types.WorkerGenerateResponse, error) {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return types.WorkerGenerateResponse{}, err
+	r.mu.RLock()
+	worker := r.workers[workerURL]
+	r.mu.RUnlock()
+	if worker == nil {
+		return types.WorkerGenerateResponse{}, fmt.Errorf("worker not found")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/generate", workerURL), bytes.NewReader(body))
-	if err != nil {
-		return types.WorkerGenerateResponse{}, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return types.WorkerGenerateResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		if resp.StatusCode == http.StatusTooManyRequests {
-			return types.WorkerGenerateResponse{}, errWorkerSaturated
+	return worker.cb.Execute(func() (types.WorkerGenerateResponse, error) {
+		body, err := json.Marshal(payload)
+		if err != nil {
+			return types.WorkerGenerateResponse{}, err
 		}
-		return types.WorkerGenerateResponse{}, fmt.Errorf("worker returned status %d", resp.StatusCode)
-	}
 
-	var generateResp types.WorkerGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&generateResp); err != nil {
-		return types.WorkerGenerateResponse{}, err
-	}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/generate", workerURL), bytes.NewReader(body))
+		if err != nil {
+			return types.WorkerGenerateResponse{}, err
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	return generateResp, nil
+		resp, err := r.client.Do(req)
+		if err != nil {
+			return types.WorkerGenerateResponse{}, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			if resp.StatusCode == http.StatusTooManyRequests {
+				return types.WorkerGenerateResponse{}, errWorkerSaturated
+			}
+			return types.WorkerGenerateResponse{}, fmt.Errorf("worker returned status %d", resp.StatusCode)
+		}
+
+		var generateResp types.WorkerGenerateResponse
+		if err := json.NewDecoder(resp.Body).Decode(&generateResp); err != nil {
+			return types.WorkerGenerateResponse{}, err
+		}
+
+		return generateResp, nil
+	})
 }
 
 func estimateRequestCost(req types.InferenceRequest) int {

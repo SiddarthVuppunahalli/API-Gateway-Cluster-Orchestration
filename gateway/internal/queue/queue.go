@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/sidda/api-gateway-cluster-orchestration/gateway/internal/metrics"
 	"github.com/sidda/api-gateway-cluster-orchestration/gateway/internal/router"
 	"github.com/sidda/api-gateway-cluster-orchestration/gateway/internal/types"
 )
@@ -58,6 +59,7 @@ func (q *GatewayQueue) Enqueue(ctx context.Context, req types.InferenceRequest) 
 	select {
 	case q.jobs <- work:
 		q.accepted.Add(1)
+		metrics.GatewayQueueDepth.Set(float64(len(q.jobs)))
 	case <-ctx.Done():
 		return types.InferenceResponse{}, ctx.Err()
 	default:
@@ -97,6 +99,7 @@ func (q *GatewayQueue) runWorker() {
 			q.completed.Add(1)
 		}
 		q.inFlight.Add(-1)
+		metrics.GatewayQueueDepth.Set(float64(len(q.jobs)))
 
 		select {
 		case work.result <- jobResult{response: response, err: err}:

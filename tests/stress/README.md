@@ -62,6 +62,22 @@ Outputs:
 
 The saved artifacts also include failure-reason counts so non-HTTP failures are no longer hidden inside a generic `Other` bucket.
 
+Kubernetes comparison workflow:
+
+- make sure the cluster deployment is already running
+- then run:
+
+```bash
+python tests/stress/run_k8s_strategy_benchmark.py --requests 300 --concurrency 64 --workload mixed
+```
+
+This runner:
+
+- patches the gateway ConfigMap strategy
+- restarts the gateway Deployment between runs
+- uses `kubectl port-forward` to hit the in-cluster Service
+- restores the original strategy when finished
+
 Optional flag:
 
 - `--skip-cleanup` if you do not want the script to clear an existing process on the gateway port
