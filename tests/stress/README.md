@@ -83,6 +83,18 @@ This runner:
 - uses `kubectl port-forward` to hit the in-cluster Service
 - restores the original strategy when finished
 
+Kubernetes worker-failure drill:
+
+```bash
+python tests/stress/run_k8s_failure_drill.py \
+  --output docs/benchmark-results/k8s-failure-drill.json
+```
+
+The drill sends continuous traffic, deletes the current `worker-b` pod, waits for
+its replacement to become ready, and reports request outcomes before, during, and
+after recovery. Pod deletion is intentional and limited to the Deployment-managed
+pod selected by `app=worker-b`.
+
 Optional flag:
 
 - `--skip-cleanup` if you do not want the script to clear an existing process on the gateway port

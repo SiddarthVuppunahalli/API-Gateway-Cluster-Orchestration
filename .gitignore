@@ -14,3 +14,7 @@ gateway/.cache/
 benchmarks/*.json
 benchmarks/*.md
 !benchmarks/.gitkeep
+
+# Personal design and exploratory benchmark notes. Curated results live in docs/benchmark-results/.
+docs/concepts.md
+docs/benchmarks.md

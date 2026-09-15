@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: gateway/go.mod
+          cache-dependency-path: gateway/go.sum
+
+      - name: Test Go gateway
+        working-directory: gateway
+        run: go test ./...
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Test stress tooling
+        run: |
+          python -m compileall worker/app tests/stress
+          python -m unittest discover -s tests/stress -p "test_*.py"
+
+      - name: Validate Docker Compose
+        run: docker compose -f deploy/docker/docker-compose.yml config --quiet
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.34.1
+
+      - name: Validate Kubernetes manifests
+        run: kubectl kustomize deploy/k8s > /dev/null

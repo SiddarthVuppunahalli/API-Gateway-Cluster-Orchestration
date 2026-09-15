@@ -1,5 +1,7 @@
 # Simulated LLM Inference Gateway & Cluster Orchestration
 
+[![CI](https://github.com/SiddarthVuppunahalli/API-Gateway-Cluster-Orchestration/actions/workflows/ci.yml/badge.svg)](https://github.com/SiddarthVuppunahalli/API-Gateway-Cluster-Orchestration/actions/workflows/ci.yml)
+
 A small distributed system for exploring the infrastructure around LLM inference: admission control, backpressure, request scheduling, worker health, failure isolation, and cluster orchestration.
 
 The workers do not run a real model. They simulate inference cost so the project can focus on the harder control-plane question: **how should a gateway keep an uneven worker cluster useful when traffic is bursty and requests have very different costs?**
@@ -134,7 +136,7 @@ The runner builds the gateway once, runs three trials per strategy, alternates s
 
 Interpret the results carefully: the cost-aware policy is intentionally a simple scheduler, and existing runs do not show a universal winner. The useful engineering story is the repeatable comparison, the observable trade-offs, and the ability to refine the policy from evidence—not a claim that one algorithm always wins.
 
-See the [representative three-trial report](docs/benchmark-results/strategy-comparison-20260914.md), [Benchmark findings](docs/benchmarks.md), and [Stress testing](tests/stress/README.md) for methodology and additional options.
+See the [representative three-trial report](docs/benchmark-results/strategy-comparison-20260914.md) and [Stress testing](tests/stress/README.md) for methodology and additional options.
 
 ## Kubernetes demo
 
@@ -163,6 +165,15 @@ python tests/stress/run_k8s_strategy_benchmark.py \
   --concurrency 64 \
   --workload mixed
 ```
+
+To measure service continuity while Kubernetes replaces a worker:
+
+```bash
+python tests/stress/run_k8s_failure_drill.py \
+  --output docs/benchmark-results/k8s-failure-drill.json
+```
+
+This intentionally deletes the `worker-b` pod, keeps requests flowing through the gateway, and reports behavior before, during, and after the replacement becomes ready.
 
 Detailed setup and failure-test ideas are in [Kubernetes deployment notes](docs/kubernetes.md).
 
@@ -217,7 +228,7 @@ docker compose \
 | Cost estimate from input size | Cheap and easy to explain | It is only a proxy for real compute cost |
 | Retry on saturation | Lets short bursts drain instead of failing immediately | Can increase tail latency under sustained overload |
 
-More reasoning is documented in [Concepts and engineering notes](docs/concepts.md) and [Architecture notes](docs/architecture.md).
+More reasoning is documented in [Architecture notes](docs/architecture.md).
 
 ## Repository layout
 
@@ -227,7 +238,7 @@ worker/           Python/FastAPI inference simulator
 deploy/docker/    Container images, Compose topology, and observability stack
 deploy/k8s/       Kubernetes Deployments, Services, probes, and ConfigMap
 tests/stress/     Burst generator and routing-strategy benchmark runners
-docs/             Architecture, concepts, Kubernetes, and benchmark notes
+docs/             Curated architecture, Kubernetes, and benchmark evidence
 benchmarks/       Locally generated benchmark artifacts (ignored by Git)
 ```
 

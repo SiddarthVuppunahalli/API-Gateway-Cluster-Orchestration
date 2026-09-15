@@ -4,9 +4,9 @@
 
 Model the control-plane behavior of an LLM-serving system without needing a real model backend. The gateway should make realistic scheduling decisions while workers simulate inference latency and capacity constraints.
 
-## Current Phase
+## Current Request Path
 
-The current code now covers the first concurrency milestone:
+The current code implements the full simulated request path:
 
 1. Receive an inference request at the gateway.
 2. Attempt to admit the request into a bounded in-memory queue.
@@ -17,7 +17,7 @@ The current code now covers the first concurrency milestone:
 7. Simulate generation on the worker and return a synthetic result.
 8. Record queue, router, and request lifecycle counters for visibility.
 
-## Planned Evolution
+## Components
 
 ### Gateway
 
@@ -32,13 +32,16 @@ Current:
 - request-cost-aware worker scoring
 - saturation-aware wait and retry behavior
 - worker failover on request errors
+- per-worker circuit breakers
+- per-key token-bucket rate limiting
+- Prometheus request and queue metrics
 
 Next:
 
 - richer heartbeat model
 - request prioritization
-- retry policy with circuit-breaking behavior
-- Prometheus-compatible metrics exposure
+- authenticated API keys for any public deployment
+- bounded lifecycle management for rate-limit buckets
 
 ### Worker
 
@@ -59,18 +62,20 @@ Next:
 Current:
 
 - local Docker Compose topology
+- Kubernetes Deployments and Services
+- readiness and liveness probes
+- repeatable strategy benchmark and worker-failure drill runners
 
 Next:
 
-- Kubernetes Deployments and Services
-- readiness and liveness probes
+- commit a measured Kubernetes failure-drill report
 - scale-out experiments
 
 ## Routing Strategy
 
 The router now uses a projected score based on cached state:
 
-`score ~= projected_utilization + projected_queued_tokens`
+`score = (queued_tokens + estimated_request_cost) / max_concurrent_requests`
 
 Where projected utilization reflects the request being considered, not just the current snapshot. This is intentionally more expressive than round robin while still being easy to reason about. Future phases can include:
 
@@ -88,6 +93,7 @@ Where projected utilization reflects the request being considered, not just the 
 - accepted, completed, rejected, and failed request totals
 - cached worker count and healthy worker count
 - available worker count and saturated worker count
+- Prometheus request totals, request duration, and queue depth
 
 ## Metrics To Add
 
@@ -95,7 +101,7 @@ Where projected utilization reflects the request being considered, not just the 
 - worker selection distribution
 - worker failure count
 - retry count
-- p50, p95, and p99 latency
+- circuit-breaker state and rate-limit rejection counts
 
 ## Failure Scenarios To Test
 
@@ -104,14 +110,15 @@ Where projected utilization reflects the request being considered, not just the 
 - one worker disappears during traffic
 - all workers saturate at once
 
-## Why This Reads Well On GitHub
+## Portfolio Evidence
 
 The project should tell a complete engineering story:
 
 - clear problem statement
 - visible architecture boundaries
-- working starter services
+- working services and deployment assets
 - visible concurrency control rather than only synchronous proxying
 - cached control-plane state rather than naive live probing on every request
-- phased roadmap with measurable goals
-- benchmark artifacts once later phases land
+- automated tests and CI checks
+- a committed three-trial routing benchmark
+- a reproducible Kubernetes failure drill awaiting a measured cluster run

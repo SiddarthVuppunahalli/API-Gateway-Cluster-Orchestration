@@ -75,20 +75,25 @@ Then access:
 - `http://localhost:8080/stats`
 - `http://localhost:8080/infer`
 
-## Planned Failure Test
+## Worker Failure Test
 
-The next step after basic cluster validation is to run live traffic through the gateway and deliberately remove one worker:
+Run the automated drill against an already deployed local cluster:
 
 ```bash
-kubectl delete pod -n llm-sim -l app=worker-b
+python tests/stress/run_k8s_failure_drill.py \
+  --output docs/benchmark-results/k8s-failure-drill.json
 ```
 
-What we want to measure:
+The runner deliberately deletes the current `worker-b` pod while sending traffic,
+waits for the Deployment replacement to become ready, and records:
 
 - whether traffic keeps flowing through the remaining workers
 - how quickly the gateway stops relying on the missing worker
 - whether request failures remain bounded during recovery
 - how cluster recovery interacts with cached worker state
+
+The generated Markdown and JSON are suitable for committing as evidence. Do not
+claim measured failure recovery until a report from a real run is present.
 
 ## What Success Looks Like
 
