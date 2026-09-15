@@ -1,0 +1,815 @@
+{
+  "generated_at_utc": "20260915T063226Z",
+  "output_path": "docs\\benchmark-results\\strategy-comparison-20260914.json",
+  "gateway_url": "http://localhost:8080",
+  "requests": 300,
+  "concurrency": 64,
+  "prompt_size": 256,
+  "max_tokens": 256,
+  "workload": "mixed",
+  "timeout_seconds": 25.0,
+  "gateway_request_timeout_seconds": 20,
+  "trials": 3,
+  "workload_seed": 42,
+  "api_key_count": 64,
+  "results": [
+    {
+      "trial": 1,
+      "strategy": "round_robin",
+      "load_summary": {
+        "total_requests": 300,
+        "concurrency": 64,
+        "workload": "mixed",
+        "workload_seed": 42,
+        "api_key_count": 64,
+        "elapsed_seconds": 27.9472884000279,
+        "requests_per_second": 10.734494012653496,
+        "successful_requests_per_second": 10.448240838982736,
+        "successful_latency_samples": 292,
+        "status_counts": {
+          "200": 292,
+          "504": 8
+        },
+        "failure_reasons": {
+          "ok": 292,
+          "http_504": 8
+        },
+        "p50_latency_ms": 4268.97930004634,
+        "p95_latency_ms": 7330.0625999690965,
+        "p99_latency_ms": 7879.848499957006
+      },
+      "stats_before": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 0,
+        "completed_requests": 0,
+        "rejected_requests": 0,
+        "failed_requests": 0,
+        "router": {
+          "strategy": "round_robin",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453948460
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453948464
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453948468
+            }
+          ]
+        }
+      },
+      "stats_after": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 300,
+        "completed_requests": 292,
+        "rejected_requests": 0,
+        "failed_requests": 8,
+        "router": {
+          "strategy": "round_robin",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453976971
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453977400
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453976975
+            }
+          ]
+        }
+      },
+      "gateway_log": "2026/09/14 23:32:28 gateway listening on :8080 with 3 workers, queue_capacity=256, dispatch_workers=32, routing_strategy=round_robin\n"
+    },
+    {
+      "trial": 1,
+      "strategy": "cost",
+      "load_summary": {
+        "total_requests": 300,
+        "concurrency": 64,
+        "workload": "mixed",
+        "workload_seed": 42,
+        "api_key_count": 64,
+        "elapsed_seconds": 28.103888800018467,
+        "requests_per_second": 10.674679299179509,
+        "successful_requests_per_second": 10.674679299179509,
+        "successful_latency_samples": 300,
+        "status_counts": {
+          "200": 300
+        },
+        "failure_reasons": {
+          "ok": 300
+        },
+        "p50_latency_ms": 4400.063999986742,
+        "p95_latency_ms": 10554.03329996625,
+        "p99_latency_ms": 13927.680699969642
+      },
+      "stats_before": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 0,
+        "completed_requests": 0,
+        "rejected_requests": 0,
+        "failed_requests": 0,
+        "router": {
+          "strategy": "cost",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453977562
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453977567
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789453977571
+            }
+          ]
+        }
+      },
+      "stats_after": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 300,
+        "completed_requests": 300,
+        "rejected_requests": 0,
+        "failed_requests": 0,
+        "router": {
+          "strategy": "cost",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454006121
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454006666
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454006077
+            }
+          ]
+        }
+      },
+      "gateway_log": "2026/09/14 23:32:57 gateway listening on :8080 with 3 workers, queue_capacity=256, dispatch_workers=32, routing_strategy=cost\n"
+    },
+    {
+      "trial": 2,
+      "strategy": "cost",
+      "load_summary": {
+        "total_requests": 300,
+        "concurrency": 64,
+        "workload": "mixed",
+        "workload_seed": 42,
+        "api_key_count": 64,
+        "elapsed_seconds": 27.210973699984606,
+        "requests_per_second": 11.024963799813225,
+        "successful_requests_per_second": 10.767714644484249,
+        "successful_latency_samples": 293,
+        "status_counts": {
+          "200": 293,
+          "504": 7
+        },
+        "failure_reasons": {
+          "ok": 293,
+          "http_504": 7
+        },
+        "p50_latency_ms": 4240.38129998371,
+        "p95_latency_ms": 7402.692099974956,
+        "p99_latency_ms": 7687.284299987368
+      },
+      "stats_before": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 0,
+        "completed_requests": 0,
+        "rejected_requests": 0,
+        "failed_requests": 0,
+        "router": {
+          "strategy": "cost",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454006833
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454006837
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454006841
+            }
+          ]
+        }
+      },
+      "stats_after": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 300,
+        "completed_requests": 293,
+        "rejected_requests": 0,
+        "failed_requests": 7,
+        "router": {
+          "strategy": "cost",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454034936
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454034921
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454035012
+            }
+          ]
+        }
+      },
+      "gateway_log": "2026/09/14 23:33:26 gateway listening on :8080 with 3 workers, queue_capacity=256, dispatch_workers=32, routing_strategy=cost\n"
+    },
+    {
+      "trial": 2,
+      "strategy": "round_robin",
+      "load_summary": {
+        "total_requests": 300,
+        "concurrency": 64,
+        "workload": "mixed",
+        "workload_seed": 42,
+        "api_key_count": 64,
+        "elapsed_seconds": 28.020600699994247,
+        "requests_per_second": 10.706408588880166,
+        "successful_requests_per_second": 10.635032531620965,
+        "successful_latency_samples": 298,
+        "status_counts": {
+          "200": 298,
+          "504": 2
+        },
+        "failure_reasons": {
+          "ok": 298,
+          "http_504": 2
+        },
+        "p50_latency_ms": 4317.9765999666415,
+        "p95_latency_ms": 7756.909099989571,
+        "p99_latency_ms": 15313.367300026584
+      },
+      "stats_before": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 0,
+        "completed_requests": 0,
+        "rejected_requests": 0,
+        "failed_requests": 0,
+        "router": {
+          "strategy": "round_robin",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454035187
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454035191
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454035195
+            }
+          ]
+        }
+      },
+      "stats_after": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 300,
+        "completed_requests": 298,
+        "rejected_requests": 0,
+        "failed_requests": 2,
+        "router": {
+          "strategy": "round_robin",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 1,
+              "last_updated_unix_ms": 1789454063697
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454063699
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454064183
+            }
+          ]
+        }
+      },
+      "gateway_log": "2026/09/14 23:33:55 gateway listening on :8080 with 3 workers, queue_capacity=256, dispatch_workers=32, routing_strategy=round_robin\n"
+    },
+    {
+      "trial": 3,
+      "strategy": "round_robin",
+      "load_summary": {
+        "total_requests": 300,
+        "concurrency": 64,
+        "workload": "mixed",
+        "workload_seed": 42,
+        "api_key_count": 64,
+        "elapsed_seconds": 28.274241900013294,
+        "requests_per_second": 10.610364057183048,
+        "successful_requests_per_second": 10.539628296801828,
+        "successful_latency_samples": 298,
+        "status_counts": {
+          "200": 298,
+          "504": 2
+        },
+        "failure_reasons": {
+          "ok": 298,
+          "http_504": 2
+        },
+        "p50_latency_ms": 4347.456399991643,
+        "p95_latency_ms": 9300.373299978673,
+        "p99_latency_ms": 12860.74259999441
+      },
+      "stats_before": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 0,
+        "completed_requests": 0,
+        "rejected_requests": 0,
+        "failed_requests": 0,
+        "router": {
+          "strategy": "round_robin",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454064380
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454064384
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454064388
+            }
+          ]
+        }
+      },
+      "stats_after": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 300,
+        "completed_requests": 298,
+        "rejected_requests": 0,
+        "failed_requests": 2,
+        "router": {
+          "strategy": "round_robin",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 1,
+              "queued_tokens": 256,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454093627
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454092911
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 1,
+              "queued_tokens": 512,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454092915
+            }
+          ]
+        }
+      },
+      "gateway_log": "2026/09/14 23:34:24 gateway listening on :8080 with 3 workers, queue_capacity=256, dispatch_workers=32, routing_strategy=round_robin\n"
+    },
+    {
+      "trial": 3,
+      "strategy": "cost",
+      "load_summary": {
+        "total_requests": 300,
+        "concurrency": 64,
+        "workload": "mixed",
+        "workload_seed": 42,
+        "api_key_count": 64,
+        "elapsed_seconds": 27.146757699956652,
+        "requests_per_second": 11.051043491668217,
+        "successful_requests_per_second": 10.756348998557064,
+        "successful_latency_samples": 292,
+        "status_counts": {
+          "200": 292,
+          "504": 8
+        },
+        "failure_reasons": {
+          "ok": 292,
+          "http_504": 8
+        },
+        "p50_latency_ms": 4344.927600002848,
+        "p95_latency_ms": 7373.251999961212,
+        "p99_latency_ms": 7953.00270000007
+      },
+      "stats_before": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 0,
+        "completed_requests": 0,
+        "rejected_requests": 0,
+        "failed_requests": 0,
+        "router": {
+          "strategy": "cost",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454093841
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454093846
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454093851
+            }
+          ]
+        }
+      },
+      "stats_after": {
+        "queue_depth": 0,
+        "queue_capacity": 256,
+        "dispatch_workers": 32,
+        "in_flight": 0,
+        "accepted_requests": 300,
+        "completed_requests": 292,
+        "rejected_requests": 0,
+        "failed_requests": 8,
+        "router": {
+          "strategy": "cost",
+          "refresh_interval_ms": 1500,
+          "stale_after_ms": 5000,
+          "cached_workers": 3,
+          "healthy_workers": 3,
+          "available_workers": 3,
+          "saturated_workers": 0,
+          "workers": [
+            {
+              "worker_id": "worker-a",
+              "base_url": "http://localhost:9001",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 8,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454121556
+            },
+            {
+              "worker_id": "worker-b",
+              "base_url": "http://localhost:9002",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 6,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454120952
+            },
+            {
+              "worker_id": "worker-c",
+              "base_url": "http://localhost:9003",
+              "active_requests": 0,
+              "queued_tokens": 0,
+              "max_concurrent": 10,
+              "healthy": true,
+              "consecutive_errors": 0,
+              "last_updated_unix_ms": 1789454121944
+            }
+          ]
+        }
+      },
+      "gateway_log": "2026/09/14 23:34:53 gateway listening on :8080 with 3 workers, queue_capacity=256, dispatch_workers=32, routing_strategy=cost\n"
+    }
+  ],
+  "aggregate": [
+    {
+      "strategy": "round_robin",
+      "trials": 3,
+      "median_successful_requests": 298,
+      "median_successful_requests_per_second": 10.539628296801828,
+      "median_p50_latency_ms": 4317.9765999666415,
+      "median_p95_latency_ms": 7756.909099989571,
+      "median_p99_latency_ms": 12860.74259999441,
+      "median_http_429": 0,
+      "median_http_503": 0,
+      "median_http_504": 2
+    },
+    {
+      "strategy": "cost",
+      "trials": 3,
+      "median_successful_requests": 293,
+      "median_successful_requests_per_second": 10.756348998557064,
+      "median_p50_latency_ms": 4344.927600002848,
+      "median_p95_latency_ms": 7402.692099974956,
+      "median_p99_latency_ms": 7953.00270000007,
+      "median_http_429": 0,
+      "median_http_503": 0,
+      "median_http_504": 7
+    }
+  ]
+}

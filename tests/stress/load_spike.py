@@ -8,7 +8,13 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def send_request(url: str, prompt_size: int, max_tokens: int, timeout: float) -> tuple[int, float, str]:
+def send_request(
+    url: str,
+    prompt_size: int,
+    max_tokens: int,
+    timeout: float,
+    api_key: str | None = None,
+) -> tuple[int, float, str]:
     payload = json.dumps(
         {
             "prompt": "x" * prompt_size,
@@ -16,10 +22,14 @@ def send_request(url: str, prompt_size: int, max_tokens: int, timeout: float) ->
         }
     ).encode("utf-8")
 
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["X-API-Key"] = api_key
+
     request = urllib.request.Request(
         url=url,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
 
@@ -68,6 +78,7 @@ def build_workload(
     prompt_size: int,
     max_tokens: int,
     workload: str,
+    seed: int = 42,
 ) -> list[tuple[int, int]]:
     if workload == "mixed":
         shapes = [
@@ -78,7 +89,7 @@ def build_workload(
             (1024, 512),
         ]
         items = [shapes[i % len(shapes)] for i in range(requests)]
-        random.shuffle(items)
+        random.Random(seed).shuffle(items)
         return items
 
     return [(prompt_size, max_tokens) for _ in range(requests)]
@@ -92,46 +103,62 @@ def run_load_test(
     max_tokens: int,
     timeout: float,
     workload: str = "uniform",
+    seed: int = 42,
+    api_key_count: int = 0,
 ) -> dict:
-    workload_items = build_workload(requests, prompt_size, max_tokens, workload)
+    workload_items = build_workload(requests, prompt_size, max_tokens, workload, seed)
     started = time.perf_counter()
     status_counts: dict[int, int] = {}
     failure_reasons: dict[str, int] = {}
-    latencies: list[float] = []
+    successful_latencies: list[float] = []
 
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
-        futures = [
-            executor.submit(
-                send_request,
-                url,
-                request_prompt_size,
-                request_max_tokens,
-                timeout,
+        futures = []
+        for request_index, (request_prompt_size, request_max_tokens) in enumerate(workload_items):
+            api_key = (
+                f"benchmark-{request_index % api_key_count:02d}"
+                if api_key_count > 0
+                else None
             )
-            for request_prompt_size, request_max_tokens in workload_items
-        ]
+            futures.append(
+                executor.submit(
+                    send_request,
+                    url,
+                    request_prompt_size,
+                    request_max_tokens,
+                    timeout,
+                    api_key,
+                )
+            )
 
         for future in as_completed(futures):
             status, latency_ms, reason = future.result()
             status_counts[status] = status_counts.get(status, 0) + 1
             failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
-            latencies.append(latency_ms)
+            if status == 200:
+                successful_latencies.append(latency_ms)
 
     total_duration = time.perf_counter() - started
-    latencies.sort()
+    successful_latencies.sort()
 
     def percentile(p: float) -> float:
-        if not latencies:
+        if not successful_latencies:
             return 0.0
-        index = int((len(latencies) - 1) * p)
-        return latencies[index]
+        index = int((len(successful_latencies) - 1) * p)
+        return successful_latencies[index]
+
+    successful_requests = status_counts.get(200, 0)
 
     return {
         "total_requests": requests,
         "concurrency": concurrency,
         "workload": workload,
+        "workload_seed": seed,
+        "api_key_count": api_key_count,
         "elapsed_seconds": total_duration,
         "requests_per_second": requests / total_duration if total_duration > 0 else 0.0,
+        "successful_requests_per_second": successful_requests / total_duration if total_duration > 0 else 0.0,
+        "successful_latency_samples": len(successful_latencies),
         "status_counts": status_counts,
         "failure_reasons": failure_reasons,
         "p50_latency_ms": percentile(0.50),
@@ -147,11 +174,12 @@ def print_summary(summary: dict) -> None:
     print(f"Workload: {summary['workload']}")
     print(f"Elapsed seconds: {summary['elapsed_seconds']:.2f}")
     print(f"Requests/sec: {summary['requests_per_second']:.2f}")
+    print(f"Successful requests/sec: {summary['successful_requests_per_second']:.2f}")
     print(f"Status counts: {summary['status_counts']}")
     print(f"Failure reasons: {summary['failure_reasons']}")
-    print(f"P50 latency ms: {summary['p50_latency_ms']:.2f}")
-    print(f"P95 latency ms: {summary['p95_latency_ms']:.2f}")
-    print(f"P99 latency ms: {summary['p99_latency_ms']:.2f}")
+    print(f"Successful-response P50 latency ms: {summary['p50_latency_ms']:.2f}")
+    print(f"Successful-response P95 latency ms: {summary['p95_latency_ms']:.2f}")
+    print(f"Successful-response P99 latency ms: {summary['p99_latency_ms']:.2f}")
 
 
 def main() -> None:
@@ -163,6 +191,13 @@ def main() -> None:
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--timeout", type=float, default=12.0)
     parser.add_argument("--workload", choices=("uniform", "mixed"), default="uniform")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--api-key-count",
+        type=int,
+        default=0,
+        help="Rotate this many synthetic X-API-Key values; 0 uses the anonymous bucket.",
+    )
     args = parser.parse_args()
 
     summary = run_load_test(
@@ -173,6 +208,8 @@ def main() -> None:
         max_tokens=args.max_tokens,
         timeout=args.timeout,
         workload=args.workload,
+        seed=args.seed,
+        api_key_count=args.api_key_count,
     )
     print_summary(summary)
 

@@ -52,6 +52,11 @@ Automated comparison workflow:
 python tests/stress/run_strategy_benchmark.py --requests 300 --concurrency 64 --workload mixed
 ```
 
+The strategy benchmark runs three trials by default, uses the same deterministic
+workload order for both strategies, and rotates synthetic `X-API-Key` bucket
+identifiers so rate limiting does not dominate the routing comparison. These are
+not credentials. Successful-response latency excludes rejected and failed requests.
+
 Outputs:
 
 - console summaries for both strategies

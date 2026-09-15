@@ -86,6 +86,8 @@ The response identifies the selected worker and reports simulated latency:
 }
 ```
 
+`X-API-Key` currently identifies a rate-limit bucket; it is not an authentication credential. Do not expose the gateway publicly without adding real authentication or placing it behind an authenticated proxy.
+
 ### 3. Create a traffic spike
 
 ```bash
@@ -128,11 +130,11 @@ python tests/stress/run_strategy_benchmark.py \
   --workload mixed
 ```
 
-The runner starts the gateway once with `round_robin` and once with `cost`, applies the same workload to both, and writes JSON plus Markdown reports under `benchmarks/`.
+The runner builds the gateway once, runs three trials per strategy, alternates strategy order, applies the same seeded workload to both, and writes JSON plus Markdown reports under `benchmarks/`.
 
 Interpret the results carefully: the cost-aware policy is intentionally a simple scheduler, and existing runs do not show a universal winner. The useful engineering story is the repeatable comparison, the observable trade-offs, and the ability to refine the policy from evidence—not a claim that one algorithm always wins.
 
-See [Benchmark findings](docs/benchmarks.md) for the current interpretation and [Stress testing](tests/stress/README.md) for additional options.
+See the [representative three-trial report](docs/benchmark-results/strategy-comparison-20260914.md), [Benchmark findings](docs/benchmarks.md), and [Stress testing](tests/stress/README.md) for methodology and additional options.
 
 ## Kubernetes demo
 

@@ -243,6 +243,8 @@ def run_strategy(
     warmup_seconds: float,
     rollout_timeout: int,
     workload: str,
+    seed: int,
+    api_key_count: int,
 ) -> dict:
     patch_routing_strategy(namespace, configmap, strategy)
     rollout_restart(namespace, deployment, rollout_timeout)
@@ -271,6 +273,8 @@ def run_strategy(
             max_tokens=max_tokens,
             timeout=timeout,
             workload=workload,
+            seed=seed,
+            api_key_count=api_key_count,
         )
         log("capturing post-run stats")
         after_stats = fetch_json(f"{base_url}/stats")
@@ -300,12 +304,19 @@ def main() -> None:
     parser.add_argument("--prompt-size", type=int, default=256)
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--workload", choices=("uniform", "mixed"), default="mixed")
-    parser.add_argument("--timeout", type=float, default=12.0)
+    parser.add_argument("--timeout", type=float, default=25.0)
     parser.add_argument("--request-timeout-seconds", type=int, default=20)
     parser.add_argument("--warmup-seconds", type=float, default=0.5)
     parser.add_argument("--rollout-timeout-seconds", type=int, default=120)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--api-key-count", type=int, default=64)
     parser.add_argument("--output", default="")
     args = parser.parse_args()
+
+    if args.api_key_count <= 0:
+        parser.error("--api-key-count must be positive for a routing benchmark")
+    if args.timeout <= args.request_timeout_seconds:
+        parser.error("--timeout must be greater than --request-timeout-seconds")
 
     repo_root = Path(__file__).resolve().parents[2]
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -333,6 +344,8 @@ def main() -> None:
         "workload": args.workload,
         "timeout_seconds": args.timeout,
         "gateway_request_timeout_seconds": args.request_timeout_seconds,
+        "workload_seed": args.seed,
+        "api_key_count": args.api_key_count,
         "results": [],
     }
 
@@ -356,6 +369,8 @@ def main() -> None:
                 warmup_seconds=args.warmup_seconds,
                 rollout_timeout=args.rollout_timeout_seconds,
                 workload=args.workload,
+                seed=args.seed,
+                api_key_count=args.api_key_count,
             )
             report["results"].append(result)
     finally:
