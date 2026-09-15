@@ -13,8 +13,9 @@ The current code now covers the first concurrency milestone:
 3. Have a dispatcher goroutine pull the request from the queue.
 4. Estimate request cost from prompt size and token budget.
 5. Score workers using cached capacity snapshots refreshed on a periodic loop.
-6. Simulate generation on the worker and return a synthetic result.
-7. Record queue, router, and request lifecycle counters for visibility.
+6. Wait and retry when the cluster is temporarily saturated instead of failing immediately on worker fullness.
+7. Simulate generation on the worker and return a synthetic result.
+8. Record queue, router, and request lifecycle counters for visibility.
 
 ## Planned Evolution
 
@@ -29,6 +30,7 @@ Current:
 - queue depth and rejection statistics
 - periodic worker-state cache
 - request-cost-aware worker scoring
+- saturation-aware wait and retry behavior
 - worker failover on request errors
 
 Next:
@@ -85,6 +87,7 @@ Where projected utilization reflects the request being considered, not just the 
 - in-flight request count
 - accepted, completed, rejected, and failed request totals
 - cached worker count and healthy worker count
+- available worker count and saturated worker count
 
 ## Metrics To Add
 

@@ -1,391 +1,246 @@
-# LLM Inference API Gateway & Cluster Orchestration
+# Simulated LLM Inference Gateway & Cluster Orchestration
 
-Distributed systems project focused on scalable inference routing, cluster orchestration, and fault tolerance. The system simulates an LLM-serving platform with a Go-based API gateway, Python worker nodes, containerized local deployment, and a Kubernetes-ready architecture for later phases.
+A small distributed system for exploring the infrastructure around LLM inference: admission control, backpressure, request scheduling, worker health, failure isolation, and cluster orchestration.
 
-## Why This Project
+The workers do not run a real model. They simulate inference cost so the project can focus on the harder control-plane question: **how should a gateway keep an uneven worker cluster useful when traffic is bursty and requests have very different costs?**
 
-This repository is being built to demonstrate practical distributed systems skills:
+## What this project demonstrates
 
-- concurrency and backpressure in Go
-- compute-aware request routing instead of naive round-robin balancing
-- worker orchestration with Docker and Kubernetes
-- failure handling, retries, and recovery behavior
-- observability and benchmark-driven validation
-
-## Target Resume Narrative
-
-- Architected a high-throughput inference gateway in Go using Goroutines, bounded queues, and asynchronous dispatch to process large volumes of simulated LLM requests.
-- Orchestrated a fault-tolerant microservices cluster with Docker and Kubernetes, deploying multiple Python worker nodes that simulate batching, token generation latency, and heterogeneous GPU capacity.
-- Engineered a dynamic routing strategy based on sequence length, queue pressure, and worker capacity rather than standard HTTP load balancing.
-- Validated resilience under burst traffic and worker failure through synthetic stress testing and recovery experiments.
-
-## System Overview
-
-The platform is split into a small set of focused services:
-
-- `gateway/`: Go API gateway that accepts inference requests, estimates request cost, and routes work to workers
-- `worker/`: Python service that simulates text generation latency and reports worker capacity
-- `deploy/docker/`: local multi-service deployment assets
-- `deploy/k8s/`: Kubernetes manifests for later phases
-- `tests/stress/`: synthetic load generation and resilience scenarios
-- `docs/`: architecture, concepts, and benchmark notes
-
-Current phase status:
-
-- Phase 1: repository scaffold, working gateway, worker simulator, local Docker setup
-- Phase 2: bounded queues, concurrency controls, request buffering, and overload rejection
-- Phase 3: cached worker-state routing and compute-aware scheduling
-- Phase 4: Kubernetes deployment, health probes, and failover drills
-- Phase 5: observability, dashboards, benchmark runs, and polished GitHub presentation
+- **Concurrent request dispatch:** a Go gateway feeds admitted requests to a configurable goroutine worker pool.
+- **Bounded queuing and backpressure:** the gateway uses a fixed-size in-memory queue and rejects excess work instead of allowing unbounded latency and memory growth.
+- **Compute-aware scheduling:** requests are scored from prompt length and token budget, then routed using cached worker capacity and projected load.
+- **A meaningful baseline:** the same gateway can use round-robin routing, making the scheduling policy directly benchmarkable.
+- **Heterogeneous workers:** three Python/FastAPI workers simulate different latency and concurrency profiles.
+- **Failure handling:** stale health data, dispatch errors, saturation retries, and per-worker circuit breakers keep unhealthy workers out of the request path.
+- **Operational controls:** token-bucket rate limiting, live gateway statistics, Prometheus metrics, Docker Compose, and Kubernetes health probes and Services.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    C["Synthetic Clients"] --> G["Go Gateway"]
-    G --> W1["Python Worker A"]
-    G --> W2["Python Worker B"]
-    G --> W3["Python Worker C"]
-    W1 --> M["Metrics"]
-    W2 --> M
-    W3 --> M
-    G --> M
+    C[Clients / load generator] -->|POST /infer| G[Go API gateway]
+    G --> A[Bounded admission queue]
+    A --> D[Goroutine dispatch pool]
+    D --> R{Routing strategy}
+    R -->|cost-aware or round-robin| WA[Python worker A<br/>8 slots]
+    R -->|cost-aware or round-robin| WB[Python worker B<br/>6 slots, slower]
+    R -->|cost-aware or round-robin| WC[Python worker C<br/>10 slots, faster]
+    WA & WB & WC -->|capacity snapshots| R
+    G --> S[/stats]
+    G --> M[/metrics]
 ```
 
-Request flow in the current phase:
+### Request lifecycle
 
-1. Client sends an inference request to the gateway.
-2. Gateway validates the request and attempts to place it into a bounded in-memory admission queue.
-3. A dispatcher goroutine pulls work from the queue and estimates request cost from prompt length and token budget.
-4. The router scores workers using a periodically refreshed capacity cache instead of probing every worker on every request.
-5. If the cluster is temporarily full, the gateway waits and retries instead of immediately failing on worker saturation.
-6. Worker simulates batching and generation delay, then returns a synthetic completion.
-7. Gateway exposes queue and router-state statistics through a lightweight stats endpoint.
+1. The gateway validates the request and applies a per-API-key token-bucket limit.
+2. It attempts to place the request in a bounded queue. A full queue returns `429`.
+3. A dispatcher goroutine estimates cost from prompt length and requested output tokens.
+4. The router selects a healthy worker using either cost-aware or round-robin routing.
+5. A saturated cluster is retried until capacity becomes available or the request deadline expires.
+6. The selected worker sleeps for a cost-dependent interval and returns a synthetic completion.
+7. Queue, request, and worker state are exposed through `/stats` and `/metrics`.
 
-Later phases add:
+## Five-minute demo
 
-- richer heartbeats and stale-worker eviction
-- failure-aware retries
-- Prometheus metrics and Grafana dashboards
-- Kubernetes deployment and scaling behavior
+### Prerequisites
 
-## What Makes This A Distributed Systems Project
+- Docker with Docker Compose
+- Python 3.10+ for the optional load test
 
-The value is not in calling an LLM API. The value is in the control plane decisions around the request path:
+### 1. Start the cluster
 
-- how the gateway behaves during overload
-- how work is distributed across uneven worker capacity
-- how failures are detected and isolated
-- how latency and throughput change under bursty traffic
-- how the system preserves stability during partial outages
-
-## Repository Layout
-
-```text
-.
-|-- docs/
-|   `-- architecture.md
-|   `-- concepts.md
-|-- gateway/
-|   |-- cmd/server/main.go
-|   |-- go.mod
-|   `-- internal/
-|       |-- config/config.go
-|       |-- router/router.go
-|       `-- types/types.go
-|-- worker/
-|   |-- app/main.py
-|   `-- requirements.txt
-|-- deploy/
-|   |-- docker/
-|   |   |-- Dockerfile.gateway
-|   |   |-- Dockerfile.worker
-|   |   `-- docker-compose.yml
-|   `-- k8s/
-`-- tests/
-    `-- stress/
-```
-
-## Phase Plan
-
-### Phase 1: Service Skeleton and GitHub-Ready Documentation
-
-Goals:
-
-- stand up a working Go gateway
-- stand up a worker simulator in Python
-- make the project understandable in under two minutes from the README
-- provide a local multi-container run path
-
-Deliverables:
-
-- gateway `/healthz` and `/infer`
-- worker `/healthz`, `/capacity`, and `/generate`
-- least-loaded routing based on live worker capacity responses
-- Docker Compose setup for local multi-worker runs
-- architecture and phase plan documentation that explains why the system exists
-
-### Phase 2: Concurrency and Backpressure
-
-Goals:
-
-- move from direct forwarding to buffered admission control
-- prevent overload from collapsing the gateway
-- make queue behavior visible so benchmark results are easy to explain
-
-Deliverables:
-
-- bounded request queues
-- worker dispatch pools
-- timeout and cancellation handling
-- basic load shedding strategy
-- gateway stats endpoint for queue depth, in-flight requests, and rejection counts
-- a benchmark scenario that can force queue saturation on demand
-
-### Phase 3: Compute-Aware Scheduling
-
-Goals:
-
-- make routing decisions based on estimated request cost and worker saturation
-- replace per-request live probing with a more realistic worker-state control loop
-
-Deliverables:
-
-- request cost model from prompt length and token target
-- periodic worker-state cache with staleness windows
-- configurable routing strategies with round-robin baseline and cost-aware scheduling
-- side-by-side comparison against round robin
-
-### Phase 4: Kubernetes and Failure Recovery
-
-Goals:
-
-- package and orchestrate the system as a resilient cluster
-- prove service behavior during pod restarts and worker loss
-
-Deliverables:
-
-- Kubernetes manifests
-- readiness and liveness probes
-- worker failure simulation
-- retry/failover behavior validation
-
-### Phase 5: Benchmarking and Polish
-
-Goals:
-
-- produce resume-ready evidence
-- leave behind a GitHub repo that communicates the engineering decisions quickly
-
-Deliverables:
-
-- repeatable stress tests
-- throughput and latency charts
-- recovery-time measurements
-- architecture diagrams and benchmark write-up
-
-## Local Development
-
-### Option 1: Run With Docker Compose
+From the repository root:
 
 ```bash
-docker compose -f deploy/docker/docker-compose.yml up --build
+docker compose -f deploy/docker/docker-compose.yml up --build -d
 ```
 
-Gateway:
-
-- `http://localhost:8080/healthz`
-- `http://localhost:8080/infer`
-- `http://localhost:8080/stats`
-
-Routing mode can be switched with:
+Wait until the gateway reports healthy:
 
 ```bash
-ROUTING_STRATEGY=cost
+curl http://localhost:8080/healthz
 ```
 
-Supported values:
+Expected response:
 
-- `cost`
-- `round_robin`
-
-### Option 2: Run Services Directly
-
-Gateway:
-
-```bash
-cd gateway
-go run ./cmd/server
+```json
+{"status":"ok"}
 ```
 
-From the repository root, this also works:
-
-```bash
-go run ./gateway/cmd/server
-```
-
-Worker:
-
-```bash
-cd worker
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 9001
-```
-
-On Windows PowerShell, you can launch all three local workers with:
-
-```powershell
-.\scripts\start-workers.ps1
-```
-
-## Example Request
+### 2. Send a simulated inference request
 
 ```bash
 curl -X POST http://localhost:8080/infer \
   -H "Content-Type: application/json" \
-  -d "{\"prompt\":\"Explain bounded queues in distributed systems.\",\"max_tokens\":128}"
+  -H "X-API-Key: portfolio-demo" \
+  -d '{"prompt":"Explain why bounded queues protect a service during traffic spikes.","max_tokens":128}'
 ```
 
-Example response:
+The response identifies the selected worker and reports simulated latency:
 
 ```json
 {
-  "worker_id": "worker-a",
-  "output": "Simulated completion for prompt length 45 and max_tokens 128.",
-  "latency_ms": 723
+  "worker_id": "worker-c",
+  "output": "Simulated completion for prompt length 67 and max_tokens 128.",
+  "latency_ms": 673
 }
 ```
 
-Example stats response:
-
-```json
-{
-  "queue_depth": 0,
-  "queue_capacity": 256,
-  "dispatch_workers": 32,
-  "in_flight": 1,
-  "accepted_requests": 42,
-  "completed_requests": 41,
-  "rejected_requests": 0,
-  "failed_requests": 0,
-  "router": {
-    "strategy": "cost",
-    "refresh_interval_ms": 1500,
-    "stale_after_ms": 5000,
-    "cached_workers": 3,
-    "healthy_workers": 3,
-    "available_workers": 2,
-    "saturated_workers": 1
-  }
-}
-```
-
-## Reading `/stats`
-
-The `/stats` endpoint is a live snapshot of gateway state, not a permanent final report.
-
-Key fields:
-
-- `queue_depth`: how many requests are currently waiting inside the gateway queue
-- `accepted_requests`: how many requests entered the gateway queue during this process lifetime
-- `completed_requests`: how many requests finished successfully through the gateway
-- `failed_requests`: how many requests the gateway gave up on
-- `router.strategy`: the active routing mode, either `round_robin` or `cost`
-- `router.healthy_workers`: workers considered usable from the cached control-plane view
-- `router.available_workers`: healthy workers with free capacity right now
-- `router.saturated_workers`: healthy workers that are currently full
-
-How to think about it:
-
-- `load_spike.py` tells you user-facing outcomes such as success rate and latency
-- `/stats` tells you what the gateway looked like at one moment in time
-- the benchmark report captures specific `/stats` snapshots before and after the run
-
-## Benchmarking Strategy Comparison
-
-Run the gateway once with:
+### 3. Create a traffic spike
 
 ```bash
-ROUTING_STRATEGY=round_robin
-go run ./gateway/cmd/server
+python tests/stress/load_spike.py --requests 100 --concurrency 32 --workload mixed
 ```
 
-Then repeat with:
+The script reports throughput, status-code counts, failure reasons, and p50/p95/p99 latency. The mixed workload rotates through different prompt and token sizes so scheduling decisions matter.
+
+### 4. Inspect the gateway
 
 ```bash
-ROUTING_STRATEGY=cost
-go run ./gateway/cmd/server
+curl http://localhost:8080/stats
+curl http://localhost:8080/metrics
 ```
 
-For each mode, use the same stress command:
+Look for queue depth, accepted/completed/rejected requests, in-flight work, worker health, and the active routing strategy.
+
+### 5. Stop the cluster
 
 ```bash
-python tests/stress/load_spike.py --requests 300 --concurrency 64 --prompt-size 256 --max-tokens 256 --workload mixed
+docker compose -f deploy/docker/docker-compose.yml down
 ```
 
-Compare:
+## Compare routing strategies
 
-- requests per second
-- p95 and p99 latency
-- status-code distribution
-- `/stats` router state before and after the run
+This is the strongest technical demo because it turns the scheduler design into an experiment.
 
-If you still see many timeout-style failures during heavy bursts, increase the gateway deadline for benchmarking:
+Start only the simulated workers in Docker:
 
 ```bash
-REQUEST_TIMEOUT_SECONDS=20
+docker compose -f deploy/docker/docker-compose.yml up --build -d worker-a worker-b worker-c
 ```
 
-To automate the comparison, keep the workers running and use:
+With Go and Python installed locally, run the automated comparison:
 
 ```bash
-python tests/stress/run_strategy_benchmark.py --requests 300 --concurrency 64 --prompt-size 256 --max-tokens 256 --workload mixed
+python tests/stress/run_strategy_benchmark.py \
+  --requests 300 \
+  --concurrency 64 \
+  --workload mixed
 ```
 
-This will:
+The runner starts the gateway once with `round_robin` and once with `cost`, applies the same workload to both, and writes JSON plus Markdown reports under `benchmarks/`.
 
-- start the gateway in `round_robin`
-- run the load test and capture `/stats`
-- restart the gateway in `cost`
-- run the same load test and capture `/stats`
-- write a JSON report and Markdown summary under `benchmarks/`
+Interpret the results carefully: the cost-aware policy is intentionally a simple scheduler, and existing runs do not show a universal winner. The useful engineering story is the repeatable comparison, the observable trade-offs, and the ability to refine the policy from evidence—not a claim that one algorithm always wins.
 
-The benchmark artifacts also break down non-HTTP failures by reason so you can separate:
+See [Benchmark findings](docs/benchmarks.md) for the current interpretation and [Stress testing](tests/stress/README.md) for additional options.
 
-- request timeouts
-- connection-level issues
-- HTTP-level gateway failures
+## Kubernetes demo
 
-A running summary of benchmark findings lives in [docs/benchmarks.md](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/docs/benchmarks.md).
+The Kubernetes manifests preserve the workers' different capacity profiles and expose each worker through a ClusterIP Service.
 
-For Kubernetes-based strategy comparison, use [tests/stress/run_k8s_strategy_benchmark.py](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/tests/stress/run_k8s_strategy_benchmark.py), which patches the in-cluster gateway ConfigMap and restarts the Deployment between runs.
+```bash
+docker build -f deploy/docker/Dockerfile.gateway -t llm-gateway:local .
+docker build -f deploy/docker/Dockerfile.worker -t llm-worker:local .
+kubectl apply -k deploy/k8s
+kubectl get pods,services -n llm-sim
+kubectl port-forward -n llm-sim service/gateway 8080:8080
+```
 
-Why `mixed` workload matters:
+For `kind`, load both local images before applying the manifests:
 
-- uniform requests often make round-robin look deceptively strong
-- mixed request sizes create uneven compute pressure across workers
-- compute-aware routing should be easier to distinguish under heterogeneous request cost
+```bash
+kind load docker-image llm-gateway:local
+kind load docker-image llm-worker:local
+```
 
-## Success Criteria
+Once the gateway is reachable, the Kubernetes benchmark runner switches strategies by patching the ConfigMap and restarting the gateway Deployment:
 
-By the end of this build, the repository should show:
+```bash
+python tests/stress/run_k8s_strategy_benchmark.py \
+  --requests 300 \
+  --concurrency 64 \
+  --workload mixed
+```
 
-- thoughtful service boundaries
-- evidence of concurrency control
-- routing logic tied to compute cost
-- resilience under worker failure
-- real metrics and benchmark artifacts
+Detailed setup and failure-test ideas are in [Kubernetes deployment notes](docs/kubernetes.md).
 
-Each phase should also leave behind three visible artifacts:
+## API surface
 
-- a runnable behavior
-- a measurable system property
-- a README or docs update that explains the design tradeoff
+| Service | Endpoint | Purpose |
+| --- | --- | --- |
+| Gateway | `GET /healthz` | Process health |
+| Gateway | `POST /infer` | Submit simulated inference work |
+| Gateway | `GET /stats` | Queue, lifecycle, and router snapshot |
+| Gateway | `GET /metrics` | Prometheus metrics |
+| Worker | `GET /healthz` | Worker health |
+| Worker | `GET /capacity` | Current load and capacity |
+| Worker | `POST /generate` | Run a simulated generation |
 
-The running design rationale lives in [docs/concepts.md](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/docs/concepts.md), which is updated as each phase lands.
+## Configuration
 
-The current Kubernetes deployment notes live in [docs/kubernetes.md](C:/Users/sidda/projects/API-Gateway-Cluster-Orchestration/docs/kubernetes.md).
+| Variable | Default | Description |
+| --- | ---: | --- |
+| `ROUTING_STRATEGY` | `cost` | `cost` or `round_robin` |
+| `QUEUE_CAPACITY` | `256` | Maximum requests waiting at the gateway |
+| `DISPATCH_WORKERS` | `32` | Number of concurrent gateway dispatchers |
+| `REQUEST_TIMEOUT_SECONDS` | `8` | End-to-end gateway request deadline |
+| `WORKER_REFRESH_MS` | `1500` | Capacity-cache refresh interval |
+| `WORKER_STALE_AFTER_MS` | `5000` | Age after which a worker snapshot is unusable |
+| `WORKER_URLS` | local ports 9001–9003 | Comma-separated worker endpoints |
 
-## Current Focus
+Worker behavior is controlled with `WORKER_ID`, `BASE_DELAY_MS`, `JITTER_MS`, and `MAX_CONCURRENT`.
 
-The gateway now supports both cached cost-aware routing and a round-robin baseline, and it treats temporary worker saturation as a scheduling problem instead of an immediate hard failure. The next engineering milestone is to benchmark those modes again, add richer worker heartbeats, and then carry the behavior into Kubernetes failure testing.
+## Observability
+
+Prometheus can scrape the gateway directly. An optional local Prometheus/Grafana stack is included:
+
+```bash
+docker compose \
+  -f deploy/docker/docker-compose.yml \
+  -f deploy/docker/docker-compose.observability.yml \
+  up --build
+```
+
+- Gateway: <http://localhost:8080>
+- Prometheus: <http://localhost:9090>
+- Grafana: <http://localhost:3000> (default local credentials: `admin` / `admin`)
+
+## Design trade-offs
+
+| Choice | Benefit | Limitation |
+| --- | --- | --- |
+| Simulated inference | Fast systems experiments without a GPU | Results do not represent real model throughput |
+| Bounded in-memory queue | Explicit overload behavior and bounded memory | Queue contents do not survive a gateway restart |
+| Cached worker capacity | Avoids probing every worker for every request | Routing decisions can briefly use stale state |
+| Cost estimate from input size | Cheap and easy to explain | It is only a proxy for real compute cost |
+| Retry on saturation | Lets short bursts drain instead of failing immediately | Can increase tail latency under sustained overload |
+
+More reasoning is documented in [Concepts and engineering notes](docs/concepts.md) and [Architecture notes](docs/architecture.md).
+
+## Repository layout
+
+```text
+gateway/          Go API gateway, queue, router, rate limiter, and metrics
+worker/           Python/FastAPI inference simulator
+deploy/docker/    Container images, Compose topology, and observability stack
+deploy/k8s/       Kubernetes Deployments, Services, probes, and ConfigMap
+tests/stress/     Burst generator and routing-strategy benchmark runners
+docs/             Architecture, concepts, Kubernetes, and benchmark notes
+benchmarks/       Locally generated benchmark artifacts (ignored by Git)
+```
+
+## Suggested portfolio presentation
+
+The best presentation is a short recorded demo linked near the top of this README, backed by the reproducible local steps above:
+
+1. Show the three workers with different capacities in `/stats`.
+2. Run the mixed traffic spike and point out latency and completion counts.
+3. Show queue and router state after the run.
+4. Run or summarize the round-robin versus cost-aware comparison.
+5. End on one trade-off or next experiment instead of claiming unrealistic production performance.
+
+A permanently hosted public cluster is optional. Because the project needs four continuously running services and exposes a load-generating endpoint, a video plus local demo is usually clearer and cheaper. If a live URL is important, deploy one public gateway and three private worker services using a multi-service infrastructure-as-code definition, add strict rate limits, and keep the workload intentionally small.
+
+## Scope
+
+This is an infrastructure simulation, not a production inference platform. It does not load model weights, stream tokens, persist requests, authenticate users, or autoscale from real accelerator telemetry. Those boundaries are intentional: the repository is designed to make gateway and orchestration decisions easy to inspect, run, and discuss.
